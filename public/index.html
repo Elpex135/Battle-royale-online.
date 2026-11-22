@@ -1,2 +1,75 @@
-Local/Temp/9d854fb5-7634-44b7-b2d7-70f716483013_battle-royale-online%20(1).zip.013/battle-royale-online/public/index.html
+<!doctype html>
+<html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Battle Royale Online</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#12221f;color:#f3fbf8;font-family:system-ui,Arial;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh;touch-action:none}
+#top{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.pill{background:#071411dc;border:1px solid #52746a;border-radius:10px;padding:8px 12px;font-weight:750;text-shadow:0 1px 3px #000}
+#bottom{position:fixed;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:end;gap:8px;pointer-events:none}
+#help,#opts{background:#071411dc;border:1px solid #52746a;border-radius:10px;padding:9px 11px;font-size:12px;pointer-events:auto}
+button{background:#173c32;color:white;border:1px solid #71a995;border-radius:8px;padding:9px 11px;font-weight:800;margin:2px}
+button.active{background:#16704b}
+#status{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#071411dc;padding:7px 12px;border-radius:9px;font-size:13px}
+#join{position:fixed;inset:0;background:#081713ed;display:grid;place-items:center}
+#joinbox{width:min(92vw,390px);background:#142b24;border:1px solid #709b89;border-radius:18px;padding:22px;text-align:center}
+input{width:100%;padding:12px;border-radius:8px;border:1px solid #709b89;background:#071713;color:white;font-size:16px;margin:10px 0}
+#joinbox button{width:100%;padding:12px}
+#mobile{display:none}
+@media(max-width:700px){#help{display:none}#mobile{display:flex;gap:5px;pointer-events:auto}#mobile button{padding:14px 16px;font-size:18px}#opts{font-size:11px}}
+</style></head><body>
+<canvas id="game"></canvas>
+<div id="top"><div class="pill">🌴 BATTLE ROYALE ONLINE</div><div class="pill">❤️ <span id="hp">100</span>　🎯 <span id="kills">0</span></div></div>
+<div id="status">Yhdistetään palvelimeen…</div>
+<div id="bottom"><div id="help">WASD = liiku · Hiiri = tähtää · Klikkaus = ammu<br>Puhelimella käytä alareunan ohjaimia.</div>
+<div id="mobile"><button id="up">▲</button><button id="left">◀</button><button id="down">▼</button><button id="right">▶</button><button id="fire">🔥</button></div>
+<div id="opts"><button id="aim" class="active">Aimbot ON</button><button id="wall" class="active">Wallhack ON</button></div></div>
+<div id="join"><div id="joinbox"><h1>Liity areenalle</h1><p>Anna nimimerkki ja pelaa muiden kanssa samalla palvelimella.</p><input id="nick" maxlength="16" placeholder="Nimimerkki" value="Pelaaja"><button id="connect">LIITY PELIIN</button><p style="font-size:12px;color:#b8cec5">Peli tarvitsee internetissä olevan palvelimen. Ohjeet löytyvät mukana tulevasta README-tiedostosta.</p></div></div>
+<script>
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
+let W=innerWidth,H=innerHeight,dpr=1;function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
+let ws=null,myId=null,players={},me=null,aim=true,wall=true,keys={},mouse={x:W/2,y:H/2,down:false},world={w:1800,h:1200},lastSend=0;
+const status=document.querySelector('#status');
+function connect(){const nick=document.querySelector('#nick').value.trim()||'Pelaaja';const proto=location.protocol==='https:'?'wss':'ws';ws=new WebSocket(`${proto}://${location.host}`);
+ws.onopen=()=>{status.textContent='Yhdistetty! Odotetaan pelaajia…';ws.send(JSON.stringify({type:'name',name:nick}));document.querySelector('#join').style.display='none'};
+ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='welcome'){myId=m.id;world=m.world;players={};m.players.forEach(p=>players[p.id]=p);status.textContent='Online · '+Object.keys(players).length+' pelaajaa'}
+if(m.type==='joined')players[m.player.id]=m.player;
+if(m.type==='left')delete players[m.id];
+if(m.type==='state'){players={};m.players.forEach(p=>players[p.id]=p);status.textContent='Online · '+Object.keys(players).length+' pelaajaa';me=players[myId];if(me){document.querySelector('#hp').textContent=me.hp;document.querySelector('#kills').textContent=me.kills}}
+if(m.type==='hit'&&m.target===myId){status.textContent='Osumaa! Elämä: '+m.hp}
+if(m.type==='respawn')status.textContent='Palasit peliin!';};
+ws.onclose=()=>{status.textContent='Yhteys katkesi · päivitä sivu yrittääksesi uudelleen'};
+ws.onerror=()=>status.textContent='Palvelimeen ei saada yhteyttä'};
+document.querySelector('#connect').onclick=connect;
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')mouse.down=true;else fire()});addEventListener('pointerup',()=>mouse.down=false);
+document.querySelector('#aim').onclick=()=>{aim=!aim;document.querySelector('#aim').classList.toggle('active',aim);document.querySelector('#aim').textContent='Aimbot '+(aim?'ON':'OFF')};
+document.querySelector('#wall').onclick=()=>{wall=!wall;document.querySelector('#wall').classList.toggle('active',wall);document.querySelector('#wall').textContent='Wallhack '+(wall?'ON':'OFF')};
+function fire(){if(!me||!ws||ws.readyState!==1)return;let list=Object.values(players).filter(p=>p.id!==myId&&p.hp>0);if(!list.length)return;let target=list.sort((a,b)=>Math.hypot(a.x-me.x,a.y-me.y)-Math.hypot(b.x-me.x,b.y-me.y))[0];ws.send(JSON.stringify({type:'shoot',target:target.id}))}
+document.querySelector('#fire').onpointerdown=e=>{e.preventDefault();fire()};
+const mobileKeys={up:'w',down:'s',left:'a',right:'d'};for(const [id,k] of Object.entries(mobileKeys)){let b=document.querySelector('#'+id);b.onpointerdown=e=>{e.preventDefault();keys[k]=true};b.onpointerup=b.onpointerleave=()=>keys[k]=false}
+function loop(t){requestAnimationFrame(loop);ctx.clearRect(0,0,W,H);ctx.fillStyle='#29473d';ctx.fillRect(0,0,W,H);
+if(!me){ctx.fillStyle='white';ctx.font='16px system-ui';ctx.fillText('Liity peliin aloittaaksesi',24,100);return}
+let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),len=Math.hypot(dx,dy)||1;
+me.x=Math.max(20,Math.min(world.w-20,me.x+dx/len*4));me.y=Math.max(20,Math.min(world.h-20,me.y+dy/len*4));
+let others=Object.values(players).filter(p=>p.id!==myId&&p.hp>0);
+let target=others.sort((a,b)=>Math.hypot(a.x-me.x,a.y-me.y)-Math.hypot(b.x-me.x,b.y-me.y))[0];
+let angle=target&&aim?Math.atan2(target.y-me.y,target.x-me.x):Math.atan2(mouse.y-H/2,mouse.x-W/2);
+let camX=me.x-W/2,camY=me.y-H/2;
+ctx.save();ctx.translate(-camX,-camY);
+// island ground pattern
+for(let x=0;x<world.w;x+=80)for(let y=0;y<world.h;y+=80){ctx.fillStyle=((x+y)/80)%2?'#35594a':'#315444';ctx.fillRect(x,y,78,78)}
+// decorative rocks / trees
+for(let i=0;i<34;i++){let x=(i*317+90)%world.w,y=(i*197+70)%world.h;ctx.fillStyle='#53675b';ctx.beginPath();ctx.arc(x,y,17,0,7);ctx.fill();ctx.fillStyle='#1c342b';ctx.beginPath();ctx.arc(x-4,y-5,11,0,7);ctx.fill()}
+for(const p of Object.values(players)){if(p.hp<=0)continue;let x=p.x,y=p.y,isMe=p.id===myId;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(x,y,15,0,7);ctx.fill();ctx.strokeStyle=isMe?'#fff':'#17231e';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText(p.name+(isMe?' (sinä)':''),x,y-24);ctx.fillStyle='#101';ctx.fillRect(x-17,y-34,34,4);ctx.fillStyle='#5af18b';ctx.fillRect(x-17,y-34,34*p.hp/100,4);if(wall&&!isMe){ctx.strokeStyle='#ff315e';ctx.lineWidth=2;ctx.strokeRect(x-21,y-21,42,42)}}
+ctx.restore();
+// player weapon / crosshair
+ctx.save();ctx.translate(W/2,H/2);ctx.rotate(angle);ctx.fillStyle='#d9e8df';ctx.beginPath();ctx.arc(0,0,14,0,7);ctx.fill();ctx.fillStyle='#15241e';ctx.fillRect(6,-5,31,10);ctx.restore();
+ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2-9,H/2);ctx.lineTo(W/2-3,H/2);ctx.moveTo(W/2+3,H/2);ctx.lineTo(W/2+9,H/2);ctx.moveTo(W/2,H/2-9);ctx.lineTo(W/2,H/2-3);ctx.moveTo(W/2,H/2+3);ctx.lineTo(W/2,H/2+9);ctx.stroke();
+if(t-lastSend>50&&ws&&ws.readyState===1){ws.send(JSON.stringify({type:'move',x:me.x,y:me.y,angle}));lastSend=t}
+if(mouse.down&&t%(180)<20)fire();
+}
+requestAnimationFrame(loop);
+</script></body></html>
 
